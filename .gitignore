@@ -1,0 +1,6 @@
+.cache/
+__pycache__/
+*.pyc
+build.log
+v6/
+.vercel

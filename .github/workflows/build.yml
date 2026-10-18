@@ -1,0 +1,83 @@
+name: Build data
+
+# Fetching happens here, on GitHub's runners, because they have open
+# outbound network. Vercel only serves what this commits, and redeploys on
+# every commit that changes public/data.
+on:
+  schedule:
+    - cron: "17 */3 * * *"   # every three hours, off the top of the hour
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "pipeline/**"
+      - "tests/**"
+      - ".github/workflows/build.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # V6 factual data plane: read-only, public branch, only the current snapshot.
+      - name: Checkout V6 data plane
+        uses: actions/checkout@v4
+        with:
+          repository: iphoenk/FPL-iphoenk-engine
+          ref: runtime-data-v6
+          path: v6
+          fetch-depth: 1
+          sparse-checkout: data/v6/current
+        continue-on-error: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Tests
+        run: python -m unittest discover -s tests -t .
+
+      # Elite-manager picks and histories never change once a gameweek is
+      # done, so the HTTP cache carries them between runs.
+      - name: Restore HTTP cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/http
+          key: http-${{ github.run_id }}
+          restore-keys: http-
+
+      - name: Build
+        env:
+          V12_PROJECTIONS_URL: ${{ vars.V12_PROJECTIONS_URL }}
+        run: |
+          V6_ARG=""
+          if [ -d v6/data/v6/current ]; then V6_ARG="--v6 v6/data/v6/current"; fi
+          python -m pipeline.build $V6_ARG --out public/data | tee build.log
+
+      - name: Flag failed sources
+        run: |
+          if grep -q '^  FAIL' build.log; then
+            echo "::warning::Some sources failed this run:"
+            grep '^  FAIL' build.log
+          fi
+
+      - name: Commit data if it changed
+        run: |
+          git config user.name "fpl-dashboard bot"
+          git config user.email "actions@github.com"
+          git add public/data
+          if git diff --cached --quiet; then
+            echo "No data change."
+            exit 0
+          fi
+          git commit -m "data: rebuild $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
