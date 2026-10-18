@@ -43,6 +43,24 @@ switches automatically. The expected shape is documented in
 `pipeline/sources/v12.py`. Until then the dashboard's own model is primary and
 FPLens is the challenger. The Market tab shows a weekly backtest of the model.
 
+## Benchmark
+
+Every live build before a deadline logs each model's projection for the coming
+gameweek to `public/data/ledger/gwN.json` (dashboard model, FPLens, FPL's own
+`ep_next`, and two naive baselines: points per game and FPL form). After the
+gameweek finishes, all of them are scored on the same players: rank
+correlation (all players, and players who had already played), MAE, top-20
+overlap, captain points, and the points each model's own £100m squad would have
+scored against the average manager. A retro section re-runs the model from
+history alone for past gameweeks, and a head-to-head uses FPLens' own logged
+predictions. See the Benchmark tab.
+
+## Phones
+
+The page is built for phones first-class: bottom tab bar, tap tooltips, sticky
+name columns in wide tables, full-screen player pages. It can be added to the
+home screen (iOS: Share → Add to Home Screen; Android: Install app).
+
 ## Sources
 
 | Source | Used for | Join |

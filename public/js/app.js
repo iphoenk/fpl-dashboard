@@ -6,6 +6,7 @@ import { renderPlanning } from "./views/planning.js";
 import { renderMarket } from "./views/market.js";
 import { renderLeague } from "./views/league.js";
 import { renderScout } from "./views/scout.js";
+import { renderBench } from "./views/bench.js";
 
 const views = {
   overview: (r) => (S.team ? renderOverview(r) : renderWelcome(r, S.teamError)),
@@ -13,6 +14,7 @@ const views = {
   market: renderMarket,
   league: renderLeague,
   scout: renderScout,
+  bench: renderBench,
 };
 const rendered = new Set();
 let current = "overview";
@@ -39,15 +41,26 @@ function rerenderAll() {
   show(current);
 }
 
-function fillLeagues() {
-  const sel = document.getElementById("league-select");
+// League choice belongs to the team that was entered: remembered per team
+// ID, defaulting to that team's first private league. Any league ID can also
+// be typed in the Mini-league tab.
+function pickLeague() {
   const ls = S.team?.leagues || [];
-  sel.classList.toggle("hidden", !ls.length);
-  sel.innerHTML = ls.map((l) => `<option value="${l.id}">${esc(l.name)}${l.league_type === "x" ? "" : " (public)"}</option>`).join("");
-  const want = +(new URL(location.href).searchParams.get("league") || recall("fpl.league") || 0);
-  S.leagueId = ls.some((l) => l.id === want) ? want : ls[0]?.id;
-  if (S.leagueId) sel.value = S.leagueId;
+  const urlLeague = +(new URL(location.href).searchParams.get("league") || 0);
+  const saved = +(recall(`fpl.league.${S.team?.id}`) || 0);
+  S.leagueId = urlLeague || saved || ls[0]?.id || null;
 }
+
+export function setLeague(id) {
+  S.leagueId = +id;
+  if (S.team) store(`fpl.league.${S.team.id}`, S.leagueId);
+  const u = new URL(location.href);
+  u.searchParams.set("league", S.leagueId);
+  history.replaceState(null, "", u);
+  rendered.delete("league"); rendered.delete("overview");
+  show(current);
+}
+window.__setLeague = setLeague;
 
 async function setTeam(id) {
   const main = document.getElementById("view-overview");
@@ -57,12 +70,12 @@ async function setTeam(id) {
     await loadTeam(id);
     store("fpl.team", id);
     const u = new URL(location.href);
+    if (u.searchParams.get("team") !== String(id)) u.searchParams.delete("league");
     u.searchParams.set("team", id);
     history.replaceState(null, "", u);
-    fillLeagues();
+    pickLeague();
   } catch (e) {
     S.teamError = /→ 404/.test(e.message) ? `Team ID ${id} was not found on FPL.` : `Could not load team ${id}: ${e.message}`;
-    fillLeagues();
     console.error(e);
   }
   rerenderAll();
@@ -81,6 +94,32 @@ function footer() {
     <table>${m.sources.map((s) => `<tr><td>${ok(s)}</td><td>${esc(s.source)}</td><td>${esc(s.role || "")}</td><td>${esc(s.note)}</td></tr>`).join("")}</table></details>`;
 }
 
+// Tap-or-hover tooltips for anything with data-tip (fixture cells etc.),
+// because title attributes never show on a phone.
+function initTips() {
+  const tip = document.getElementById("tip");
+  let pinned = null;
+  const place = (t) => {
+    tip.innerHTML = t.dataset.tip.replace(/ · /g, "<br>");
+    tip.classList.add("on");
+    const r = t.getBoundingClientRect();
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
+    tip.style.top = `${r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8}px`;
+  };
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-tip]");
+    if (t && t !== pinned) { pinned = t; place(t); return; }
+    pinned = null; tip.classList.remove("on");
+  });
+  document.addEventListener("mouseover", (e) => {
+    if (matchMedia("(hover: none)").matches) return;
+    const t = e.target.closest("[data-tip]");
+    if (t) place(t); else if (!pinned) tip.classList.remove("on");
+  });
+  window.addEventListener("scroll", () => { pinned = null; tip.classList.remove("on"); }, { passive: true });
+}
+
 async function main() {
   initModal();
   const themeSaved = recall("fpl.theme");
@@ -93,7 +132,7 @@ async function main() {
     document.documentElement.dataset.theme = next;
     store("fpl.theme", next);
   });
-  document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => { show(b.dataset.view); window.scrollTo(0, 0); }));
 
   try {
     await loadCore();
@@ -111,14 +150,10 @@ async function main() {
     const id = input.value.trim();
     if (/^\d{1,10}$/.test(id)) setTeam(id);
   });
-  document.getElementById("league-select").addEventListener("change", (e) => {
-    S.leagueId = +e.target.value;
-    store("fpl.league", S.leagueId);
-    const u = new URL(location.href);
-    u.searchParams.set("league", S.leagueId);
-    history.replaceState(null, "", u);
-    rendered.delete("league"); rendered.delete("overview");
-    show(current);
+  initTips();
+  document.addEventListener("click", (e) => {
+    const g = e.target.closest("[data-goto]");
+    if (g) { e.preventDefault(); show(g.dataset.goto); window.scrollTo(0, 0); }
   });
 
   const hashView = location.hash.replace("#", "");

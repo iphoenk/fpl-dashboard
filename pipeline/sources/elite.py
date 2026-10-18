@@ -17,10 +17,10 @@ BASE = "https://fantasy.premierleague.com/api"
 DAY = 24 * 3600
 
 
-def fetch(gw, top_n=200, proven_rank=100_000):
+def fetch(gw, top_n=600, proven_rank=100_000, min_managers=30):
     entries = []
     page = 1
-    while len(entries) < top_n and page <= 8:
+    while len(entries) < top_n and page <= 20:
         d = net.get_json(f"{BASE}/leagues-classic/314/standings/?page_standings={page}", ttl=3 * 3600, pause=0.3)
         rows = (d.get("standings") or {}).get("results") or []
         if not rows:
@@ -50,8 +50,8 @@ def fetch(gw, top_n=200, proven_rank=100_000):
             counts[p["element"]] = counts.get(p["element"], 0) + 1
             if p.get("is_captain"):
                 caps[p["element"]] = caps.get(p["element"], 0) + 1
-    if n < 20:
-        raise ValueError(f"only {n} proven managers found; sample too small to report")
+    if n < min_managers:
+        raise ValueError(f"only {n} proven managers in the top {len(entries)}; sample too small to report")
     out = {}
     for pid, c in counts.items():
         share = c / n

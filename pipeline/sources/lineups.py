@@ -9,8 +9,12 @@ page does not join under his old club.
 Rotowire's line-ups page: names plus a club abbreviation per match, joined by
 name inside the club. It also lists injury flags (QUES/OUT).
 
-Either source returning too few starters means its markup changed; then it
-reports nothing rather than marking everyone benched."""
+A club counts as covered only when at least COVERED_MIN of its starters were
+matched, and (for Rotowire) only when the match listed is the club's fixture
+in the gameweek being projected. A page that lists half the round therefore
+covers half the clubs, and a snapshot from last week covers none: in both
+cases the uncovered clubs fall back to the start-rate model rather than being
+marked benched."""
 
 import re
 
@@ -20,7 +24,16 @@ from .names import PlayerMatcher
 
 FFS_URL = "https://www.fantasyfootballscout.co.uk/team-news"
 ROTO_URL = "https://www.rotowire.com/soccer/lineups.php"
-MIN_STARTERS = 150
+COVERED_MIN = 9
+MIN_CLUBS = 2
+
+
+def _covered(starters, team_of):
+    count = {}
+    for pid in starters:
+        t = team_of.get(pid)
+        count[t] = count.get(t, 0) + 1
+    return {t for t, c in count.items() if c >= COVERED_MIN}
 
 
 def ffs(elements, teams):
@@ -37,34 +50,43 @@ def ffs(elements, teams):
         if not head:
             continue
         club_name = re.sub(r"<[^>]+>|\s+", " ", head.group(1)).strip()
+        photos = re.findall(r"players/\d+x\d+/p?(\d+)\.png", block)
+        if not photos:
+            continue
         club = clubs.match(club_name)
         if club is None:
             unmatched.add(club_name)
             continue
-        for pid in re.findall(r"players/\d+x\d+/p?(\d+)\.png", block):
+        for pid in photos:
             e = by_photo.get(pid)
             if e and e["team"] == club:
                 starters[e["id"]] = True
-    if len(starters) < MIN_STARTERS:
-        raise ValueError(f"only {len(starters)} starters parsed; markup probably changed")
-    note = f"{len(starters)} predicted starters"
+    team_of = {e["id"]: e["team"] for e in elements}
+    covered = _covered(starters, team_of)
+    if len(covered) < MIN_CLUBS:
+        raise ValueError(f"only {len(starters)} starters parsed across {len(covered)} clubs; markup probably changed")
+    note = f"{len(starters)} predicted starters, {len(covered)} clubs covered"
     if unmatched:
         note += f"; unmatched headings: {', '.join(sorted(unmatched))[:120]}"
-    return starters, note
+    return {"starters": starters, "teams": covered}, note
 
 
-def rotowire(elements, teams, html):
+def rotowire(elements, teams, html, next_pairs):
+    """next_pairs: {(home_id, away_id)} for the gameweek being projected."""
     clubs = ClubMatcher(teams)
     players = PlayerMatcher(elements)
-    starters, flags, missed = {}, {}, 0
+    starters, flags, missed, other_round = {}, {}, 0, 0
     for box in html.split('class="lineup__box"')[1:]:
         abbrs = re.findall(r'class="lineup__abbr">\s*([A-Z]{2,4})\s*<', box)
         if len(abbrs) < 2:
             continue
-        for side, abbr in (("is-home", abbrs[0]), ("is-visit", abbrs[1])):
+        pair = (clubs.match(abbrs[0]), clubs.match(abbrs[1]))
+        if pair not in next_pairs:
+            other_round += 1
+            continue
+        for side, team in (("is-home", pair[0]), ("is-visit", pair[1])):
             m = re.search(r'<ul class="lineup__list %s">(.*?)</ul>' % side, box, re.S)
-            team = clubs.match(abbr)
-            if not m or team is None:
+            if not m:
                 continue
             body = m.group(1)
             xi_part, _, inj_part = body.partition("lineup__title")
@@ -82,10 +104,14 @@ def rotowire(elements, teams, html):
                 inj = re.search(r'lineup__inj">\s*([A-Z]+)', tail)
                 if pid is not None and inj:
                     flags[pid] = inj.group(1)
-    if len(starters) < MIN_STARTERS:
-        raise ValueError(f"only {len(starters)} starters parsed; markup probably changed")
-    return {"starters": starters, "flags": flags}, f"{len(starters)} predicted starters, {missed} names unmatched"
+    team_of = {e["id"]: e["team"] for e in elements}
+    covered = _covered(starters, team_of)
+    if len(covered) < MIN_CLUBS:
+        raise ValueError(f"no usable line-ups for this gameweek ({len(starters)} starters, "
+                         f"{other_round} matches from another round)")
+    return {"starters": starters, "flags": flags, "teams": covered}, \
+        f"{len(starters)} predicted starters, {len(covered)} clubs covered, {missed} names unmatched"
 
 
-def rotowire_live(elements, teams):
-    return rotowire(elements, teams, net.get_text(ROTO_URL, ttl=1800))
+def rotowire_live(elements, teams, next_pairs):
+    return rotowire(elements, teams, net.get_text(ROTO_URL, ttl=1800), next_pairs)

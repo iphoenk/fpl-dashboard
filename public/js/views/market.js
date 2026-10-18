@@ -102,14 +102,8 @@ export function renderMarket(root) {
   // ---- model check
   root.append(el(`<div class="section-title">How good are the projections?</div>`));
   const mc = el(`<div class="grid g2"></div>`);
-  const bt = S.meta.backtest || [];
-  mc.append(card("Backtest", "The dashboard model re-run as it stood before each recent gameweek (history only, no odds or line-ups), against what players scored. Rank correlation is the number that matters for picking; players with no appearance yet are excluded, which makes the test harder, not easier.",
-    table(bt, [
-      { k: "gw", label: "GW", get: (r) => r.gw, n: true },
-      { k: "spearman", label: "Rank corr.", get: (r) => r.spearman, n: true, fmt: (v) => fmt(v, 3) },
-      { k: "mae", label: "MAE", get: (r) => r.mae, n: true, fmt: (v) => fmt(v, 2) },
-      { k: "n", label: "Players", get: (r) => r.n, n: true },
-    ], { sort: "gw" })));
+  mc.append(card("Engine benchmark", "Every model scored on the same players: forward (logged before the deadline) and retro.",
+    `<p>Rank correlation, MAE, top-20 hits, captain points and the points each model's own £100m squad would have scored against the average manager.</p><p><a href="#bench" data-goto="bench">Open the Benchmark tab →</a></p>`));
   const lens = P.filter((p) => p.fl?.gw === S.meta.next_gw && p.fl.pred != null && (p.xp[0] > 2 || p.fl.pred > 2))
     .map((p) => ({ p, d: p.xp[0] - p.fl.pred })).sort((a, b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 10);
   mc.append(card("Biggest disagreements with FPLens", `Primary projection vs the FPLens LightGBM ensemble (${esc(S.meta.fplens?.model || "n/a")}). Big gaps are where to look closer, not who is right.`,

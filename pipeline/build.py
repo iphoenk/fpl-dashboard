@@ -12,6 +12,7 @@ import os
 import statistics
 from pathlib import Path
 
+from . import benchmark as BM
 from . import health
 from .model import history as H
 from .model import teams as T
@@ -107,20 +108,20 @@ def main(argv=None):
     if args.offline:
         health.record("Pinnacle odds", "failed", "offline build", "fixture lambdas")
 
-    lu_sources, ffs_ids, roto = [], {}, None
+    next_pairs = {(f["team_h"], f["team_a"]) for f in core["fixtures"] if f.get("event") == start_gw}
+    lu_sources, ffs_res, roto = [], None, None
     if not args.offline:
-        ffs_ids = health.run("FFS predicted line-ups", "next-GW starters", lineups.ffs, els, teams) or {}
-        roto = health.run("Rotowire line-ups (live)", "next-GW starters, injury flags", lineups.rotowire_live, els, teams)
+        ffs_res = health.run("FFS predicted line-ups", "next-GW starters", lineups.ffs, els, teams)
+        roto = health.run("Rotowire line-ups (live)", "next-GW starters, injury flags", lineups.rotowire_live, els, teams, next_pairs)
     if roto is None and snap:
         html = v6.payload(snap, "rotowire", "lineups", kind="body")
         if html:
-            roto = health.run("Rotowire line-ups (V6)", "next-GW starters, injury flags", lineups.rotowire, els, teams, html)
-    team_of = {e["id"]: e["team"] for e in els}
-    if ffs_ids:
-        lu_sources.append({"name": "ffs", "starters": ffs_ids, "teams_covered": {team_of[p] for p in ffs_ids if p in team_of}})
+            roto = health.run("Rotowire line-ups (V6)", "next-GW starters, injury flags (only if same round)",
+                              lineups.rotowire, els, teams, html, next_pairs)
+    if ffs_res:
+        lu_sources.append({"name": "ffs", "starters": ffs_res["starters"], "teams_covered": ffs_res["teams"]})
     if roto:
-        lu_sources.append({"name": "rotowire", "starters": roto["starters"],
-                           "teams_covered": {team_of[p] for p in roto["starters"] if p in team_of}})
+        lu_sources.append({"name": "rotowire", "starters": roto["starters"], "teams_covered": roto["teams"]})
 
     us = health.run("Understat (V6)", "second xG/xA opinion", understat.from_v6, snap, els, teams) if snap else None
     opta = None if args.offline else health.run("Opta via Pulselive", "big chances, shots, touches", pulse.fetch)
@@ -129,7 +130,7 @@ def main(argv=None):
     elt = None
     if not args.offline and elite_gw:
         elt = health.run("Elite ownership (league 314)", "proven top-manager ownership", elite.fetch,
-                         elite_gw, cfg["elite_top_n"], cfg["elite_proven_rank"])
+                         elite_gw, cfg["elite_top_n"], cfg["elite_proven_rank"], cfg["elite_min_managers"])
     v12doc = health.run("V12 projections", "projection authority", v12.fetch)
 
     fx = T.ratings(T.upcoming(core["fixtures"], teams, strg, mu, Hr, odds, cfg, start_gw, horizon))
@@ -258,6 +259,28 @@ def main(argv=None):
     ]
     # meta always carries a fresh timestamp; only rewrite it when data moved
     # or the source ledger changed, so an idle build commits nothing.
+    # ---- benchmark --------------------------------------------------------
+    names = {e["id"]: e["web_name"] for e in els}
+    if not args.offline:
+        logged, note = BM.write_ledger(out_dir / "ledger", start_gw, nxt["deadline_time"], players, els, hist)
+        health.record("Benchmark ledger", "ok", note, "pre-deadline prediction log")
+    fwd = BM.score_forward(out_dir / "ledger", events, core["live"], rules, names)
+    lens_hist = []
+    for row in ((lens or {}).get("accuracy_history") or {}).get("gameweeks", []):
+        m = (row.get("models") or {}).get("config_d")
+        if m:
+            lens_hist.append({"gw": row["gameweek"], "rho_all": m.get("spearman"), "mae": m.get("mae"),
+                              "n": m.get("count"), "xi": (row.get("xi") or {}).get("points"),
+                              "avg_manager": (row.get("xi") or {}).get("average_manager")})
+    bench = {
+        "forward": fwd,
+        "retro": BM.retro(core, hist, matches, cfg, scoring, finished_gws),
+        "fplens_published": lens_hist,
+        "head_to_head": BM.head_to_head(core, hist, matches, cfg, scoring, (lens or {}).get("accuracy")),
+        "ledger_gws": sorted(int(p.stem[2:]) for p in (out_dir / "ledger").glob("gw*.json")),
+    }
+    changed.append(_write(out_dir / "benchmark.json", bench))
+
     meta_path = out_dir / "meta.json"
     old_meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
     stable = lambda m: {k: v for k, v in m.items() if k not in ("built_at",)}  # noqa: E731

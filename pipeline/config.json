@@ -23,6 +23,7 @@
   "defcon_threshold_fallback": {"DEF": 10, "MID": 12, "FWD": 12},
   "saves_per_point": 3,
   "backtest_gws": 3,
-  "elite_top_n": 200,
-  "elite_proven_rank": 100000
+  "elite_top_n": 600,
+  "elite_proven_rank": 100000,
+  "elite_min_managers": 30
 }

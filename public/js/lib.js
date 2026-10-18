@@ -100,7 +100,7 @@ export function fixtureChip(p, gw, opts = {}) {
     const r = ratingFor(p, f);
     const lab = f.home ? teamShort(f.opp).toUpperCase() : teamShort(f.opp).toLowerCase();
     const title = `GW${gw} ${f.home ? "home" : "away"} vs ${S.teams.get(f.opp)?.name} · rating ${fmt(r)} · team xG ${fmt(f.lamFor, 2)}, CS ${pct(f.cs * 100)} (${f.src})`;
-    return `<span class="fx ${rClass(r)} ${opts.dim && r < opts.dim ? "dim" : ""}" title="${esc(title)}">${lab}</span>`;
+    return `<span class="fx ${rClass(r)} ${opts.dim && r < opts.dim ? "dim" : ""}" data-tip="${esc(title)}">${lab}</span>`;
   }).join(" ");
 }
 
@@ -121,7 +121,7 @@ export function statusLabel(p) {
 // ---------- sortable tables ----------
 // cols: [{k, label, get(row), fmt(v,row), n:true(numeric), title}]
 export function table(rows, cols, opts = {}) {
-  const wrap = el(`<div class="tbl-wrap"><table></table></div>`);
+  const wrap = el(`<div class="tbl-wrap"><table class="${opts.sticky === false ? "" : "sticky"}"></table></div>`);
   const tbl = wrap.querySelector("table");
   let sortKey = opts.sort ?? null;
   let asc = opts.asc ?? false;
@@ -157,6 +157,7 @@ export function table(rows, cols, opts = {}) {
       render();
       return;
     }
+    if (ev.target.closest("[data-tip], input, a")) return;
     const tr = ev.target.closest("tr[data-id]");
     if (tr && opts.onClick && tr.dataset.id) opts.onClick(tr.dataset.id);
   });

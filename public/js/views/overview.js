@@ -45,14 +45,15 @@ export function renderOverview(root) {
   const pickedXI = T.picked.filter((x) => x.pk.position <= 11).map((x) => x.p);
   const curFixturesLeft = (p) => S.fx.future.filter((f) => f.gw === T.gw && (f.h === p.t || f.a === p.t)).length;
   const stillToPlay = S.meta.current_finished ? 0 : pickedXI.filter((p) => curFixturesLeft(p) > 0).length;
-  const lg = T.leagues.find((l) => l.id === S.leagueId) || T.leagues[0];
+  const lg = T.leagues.find((l) => l.id === S.leagueId)
+    || (S.leagueId ? { name: `League ${S.leagueId}`, entry_rank: S.league?.id === S.leagueId ? S.league.managers.find((m) => m.row.entry === T.id)?.row.rank : null } : null);
 
   root.append(el(`<div class="hero"><h1>${esc(T.entry.name)}</h1><div class="who">${esc(T.entry.player_first_name)} ${esc(T.entry.player_last_name)} · team ${T.id}</div></div>`));
   const stats = [
     [`GW${T.gw} points`, eh.points ?? "–", ev?.avg ? `average ${ev.avg}` : ""],
     ["Total", T.entry.summary_overall_points ?? "–", ""],
     ["Overall rank", (T.entry.summary_overall_rank ?? 0).toLocaleString(), ""],
-    ["League", lg ? `${lg.entry_rank ?? "–"}` : "–", lg ? esc(lg.name).slice(0, 22) : ""],
+    ["League", lg ? `${lg.entry_rank ?? "–"}` : "–", lg ? `${esc(lg.name).slice(0, 22)} · <a href="#league" data-goto="league">change</a>` : ""],
     [`Projected GW${nextGw}`, fmt(best.points, 1), "best XI, captain doubled"],
     ["Bank", money(T.bank), `squad ${money(T.value)}`],
     ["Free transfers", T.ft, "estimated"],
@@ -67,7 +68,10 @@ export function renderOverview(root) {
   const pitch = card(`Best XI for GW${nextGw}`, "Picked from your 15 by projected points. Dot = likelihood to start (green likely, amber doubt, red unlikely); fixture shaded by the matchup that matters for the position.");
   const pitchEl = el(`<div class="pitch">${rows.map((r) => `<div class="row">${r.map((p) => pitchCard(p, { cap: p === best.captain ? "C" : p === best.vice ? "V" : "" })).join("")}</div>`).join("")}
     <div class="bench"><div class="lbl">BENCH</div><div class="row">${best.bench.map((p) => pitchCard(p, {})).join("")}</div></div></div>`);
-  pitchEl.addEventListener("click", (e) => { const c = e.target.closest(".pcard"); if (c) openPlayer(c.dataset.id); });
+  pitchEl.addEventListener("click", (e) => {
+    if (e.target.closest("[data-tip]")) return;
+    const c = e.target.closest(".pcard"); if (c) openPlayer(c.dataset.id);
+  });
   pitch.append(pitchEl);
   // Differences against the current picks
   const curIds = new Set(pickedXI.map((p) => p.id));

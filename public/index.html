@@ -2,10 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>FPL Dashboard</title>
   <meta name="description" content="Personal FPL dashboard: projections, planning, mini-league and scouting for any team ID.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#f4f4f1" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="FPL">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
@@ -14,26 +22,27 @@
       <div class="brand">FPL Dashboard<small id="gw-label"></small></div>
       <form class="team-form" id="team-form" autocomplete="off">
         <input id="team-input" inputmode="numeric" pattern="[0-9]*" placeholder="Team ID" aria-label="FPL team ID">
-        <select id="league-select" aria-label="Mini-league" class="hidden"></select>
         <button class="btn" type="submit">Load</button>
         <button class="btn ghost icon-btn" type="button" id="theme-btn" title="Toggle dark mode" aria-label="Toggle dark mode">&#9680;</button>
       </form>
     </div>
     <nav class="tabs" role="tablist">
-      <button role="tab" data-view="overview" aria-selected="true">Overview</button>
-      <button role="tab" data-view="planning" aria-selected="false">Planning</button>
-      <button role="tab" data-view="market" aria-selected="false">Market</button>
-      <button role="tab" data-view="league" aria-selected="false">Mini-league</button>
-      <button role="tab" data-view="scout" aria-selected="false">Scout</button>
+      <button role="tab" data-view="overview" aria-selected="true"><span class="ico" aria-hidden="true">&#9673;</span><span class="full">Overview</span><span class="short">Team</span></button>
+      <button role="tab" data-view="planning" aria-selected="false"><span class="ico" aria-hidden="true">&#8644;</span><span class="full">Planning</span><span class="short">Plan</span></button>
+      <button role="tab" data-view="league" aria-selected="false"><span class="ico" aria-hidden="true">&#9776;</span><span class="full">Mini-league</span><span class="short">League</span></button>
+      <button role="tab" data-view="scout" aria-selected="false"><span class="ico" aria-hidden="true">&#9906;</span><span class="full">Scout</span><span class="short">Scout</span></button>
+      <button role="tab" data-view="market" aria-selected="false"><span class="ico" aria-hidden="true">&#8599;</span><span class="full">Market</span><span class="short">Market</span></button>
+      <button role="tab" data-view="bench" aria-selected="false"><span class="ico" aria-hidden="true">&#10003;</span><span class="full">Benchmark</span><span class="short">Bench</span></button>
     </nav>
   </header>
 
   <main>
     <section class="view active" id="view-overview"></section>
     <section class="view" id="view-planning"></section>
-    <section class="view" id="view-market"></section>
     <section class="view" id="view-league"></section>
     <section class="view" id="view-scout"></section>
+    <section class="view" id="view-market"></section>
+    <section class="view" id="view-bench"></section>
   </main>
 
   <footer id="footer"></footer>

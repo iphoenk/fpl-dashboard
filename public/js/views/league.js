@@ -10,16 +10,48 @@ const abbr = (name) => {
 };
 const CHIP = { wildcard: "WC", freehit: "FH", bboost: "BB", "3xc": "TC" };
 
+function picker() {
+  const T = S.team;
+  const ls = T.leagues;
+  const chip = (l) => `<button class="lg-chip" type="button" data-league="${l.id}" aria-pressed="${l.id === S.leagueId}">
+      <span class="lg-name">${esc(l.name)}</span><span class="lg-rank">${l.entry_rank ? `#${l.entry_rank.toLocaleString()}` : "–"}${l.rank_count ? ` of ${l.rank_count.toLocaleString()}` : ""}</span></button>`;
+  const priv = ls.filter((l) => l.league_type === "x"), pub = ls.filter((l) => l.league_type !== "x");
+  const c = el(`<div class="card league-picker">
+    <h2>Choose a league</h2>
+    <p class="sub">Every classic league of team ${T.id} (${esc(T.entry.name)}). Large leagues show the top 20 plus you.</p>
+    ${priv.length ? `<div class="lg-group"><div class="lg-label">Private</div><div class="lg-chips">${priv.map(chip).join("")}</div></div>` : ""}
+    ${pub.length ? `<div class="lg-group"><div class="lg-label">Public and system</div><div class="lg-chips">${pub.map(chip).join("")}</div></div>` : ""}
+    <form class="lg-other"><label class="small muted" for="lg-id">Other league ID</label>
+      <input id="lg-id" class="ctl" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 123456" value="${S.leagueId && !ls.some((l) => l.id === S.leagueId) ? S.leagueId : ""}">
+      <button class="btn ghost" type="submit">Open</button></form>
+  </div>`);
+  c.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-league]");
+    if (b) window.__setLeague(+b.dataset.league);
+  });
+  c.querySelector("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = c.querySelector("#lg-id").value.trim();
+    if (/^\d{1,10}$/.test(v)) window.__setLeague(+v);
+  });
+  return c;
+}
+
 export async function renderLeague(root) {
   root.innerHTML = "";
   root.onclick = (e) => { const a = e.target.closest("a[data-id]"); if (a) { e.preventDefault(); openPlayer(a.dataset.id); } };
-  if (!S.team) { root.append(el(`<div class="empty">Load a team ID first; its mini-leagues appear in the selector at the top.</div>`)); return; }
+  if (!S.team) { root.append(el(`<div class="empty">Load a team ID first. Its leagues will be listed here to choose from.</div>`)); return; }
+  root.append(picker());
   const lid = S.leagueId || S.team.leagues[0]?.id;
-  if (!lid) { root.append(el(`<div class="empty">This team is not in any classic league.</div>`)); return; }
+  if (!lid) { root.append(el(`<div class="empty">This team is not in any classic league. Type a league ID above.</div>`)); return; }
   if (!S.league || S.league.id !== lid) {
-    root.append(el(`<div class="loading">Loading league and every rival's squad…</div>`));
-    try { await loadLeague(lid); } catch (e) { root.innerHTML = `<div class="empty err">Could not load the league: ${esc(e.message)}</div>`; return; }
-    root.innerHTML = "";
+    const wait = el(`<div class="loading">Loading league and every rival's squad…</div>`);
+    root.append(wait);
+    try { await loadLeague(lid); } catch (e) {
+      wait.replaceWith(el(`<div class="empty err">Could not load league ${lid}: ${esc(/→ 404/.test(e.message) ? "not found or not a classic league" : e.message)}</div>`));
+      return;
+    }
+    wait.remove();
   }
   const L = S.league, me = S.team.id;
   const M = L.managers.filter((m) => m.picks);
@@ -44,8 +76,7 @@ export async function renderLeague(root) {
   });
   const st = card("Standings", "XI xGI = expected goal involvements of each starting eleven this gameweek: the chances behind the points.");
   st.append(table(rows, [
-    { k: "rank", label: "#", get: (r) => r.rank, n: true },
-    { k: "name", label: "Team", get: (r) => r.name, fmt: (v, r) => `<b>${esc(v)}</b> <span class="faint small">${esc(r.mgr)}</span>` },
+    { k: "rank", label: "# Team", get: (r) => r.rank, fmt: (v, r) => `<span class="faint">${v}</span> <b>${esc(r.name)}</b><br><span class="faint small">${esc(r.mgr)}</span>` },
     { k: "gw", label: `GW${L.gw}`, get: (r) => r.gw, n: true },
     { k: "total", label: "Total", get: (r) => r.total, n: true, fmt: (v) => `<b>${v}</b>` },
     { k: "cap", label: "Captain", get: (r) => r.cap?.n ?? null },

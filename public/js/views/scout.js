@@ -78,8 +78,8 @@ export function renderScout(root) {
   function drawTable(rows) {
     tblHost.innerHTML = "";
     const cols = [
-      { k: "cmp", label: "", nosort: true, get: (p) => p.id, fmt: (v) => `<input type="checkbox" data-cmp="${v}" ${st.compare.has(v) ? "checked" : ""}>` },
       { k: "n", label: "Player", get: (p) => p.n, fmt: (v, p) => `${pname(p)}${owned.has(p.id) ? ' <span class="tag in">yours</span>' : ""}` },
+      { k: "cmp", label: "Cmp", nosort: true, get: (p) => p.id, fmt: (v) => `<input type="checkbox" data-cmp="${v}" ${st.compare.has(v) ? "checked" : ""}>` },
       { k: "c", label: "Price", get: (p) => p.c, n: true, fmt: (v) => money(v) },
       { k: "sel", label: "Own", get: (p) => p.sel, n: true, fmt: (v) => pct(v, 1) },
       { k: "st", label: "Start", get: (p) => p.nx?.pstart, n: true, fmt: (v, p) => statusLabel(p) },

@@ -22,6 +22,12 @@ def fetch():
             model = manifest.get("default_model") or "config_d"
             preds = net.get_json(f"{base}/predictions_{model}.json", ttl=1800)
             multi = net.get_json(f"{base}/multi_gw.json", ttl=1800)
+            root = base.rsplit("/data", 1)[0]
+            try:
+                accuracy = net.get_json(f"{root}/accuracy.json", ttl=3600)
+                history = net.get_json(f"{root}/accuracy_history.json", ttl=3600)
+            except (net.FetchError, ValueError):
+                accuracy = history = None
             break
         except (net.FetchError, ValueError) as e:
             last = e
@@ -37,4 +43,4 @@ def fetch():
         row["multi"] = m.get("predicted")
     info = {"gw": gw, "model": model, "generated_at": manifest.get("generated_at"),
             "models": {m["id"]: m for m in manifest.get("models", [])}}
-    return {"players": out, "info": info}, f"{len(out)} players, model {model}, GW{gw}, {(manifest.get('generated_at') or '')[:16]}"
+    return {"players": out, "info": info, "accuracy": accuracy, "accuracy_history": history}, f"{len(out)} players, model {model}, GW{gw}, {(manifest.get('generated_at') or '')[:16]}"

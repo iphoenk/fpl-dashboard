@@ -3,6 +3,11 @@
 
 import { el, esc, showTip, hideTip } from "./lib.js";
 
+// SVG text is drawn in viewBox units, so a wide viewBox squeezed onto a phone
+// shrinks the labels to nothing. Size the viewBox to the screen instead.
+const phone = () => window.innerWidth <= 720;
+const fitW = (desktop) => (phone() ? Math.max(320, window.innerWidth - 56) : desktop);
+
 const SERIES = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)", "var(--s5)"];
 export const seriesColor = (i) => SERIES[i % SERIES.length];
 
@@ -31,7 +36,7 @@ function bindHover(svg, sel, html) {
 
 // points: [{x, y, label, color?, r?, highlight?, tip, id}]
 export function scatter(points, o = {}) {
-  const W = o.width ?? 960, H = o.height ?? 420, m = { l: 46, r: 70, t: 12, b: 40 };
+  const W = fitW(o.width ?? 960), H = o.height ?? (phone() ? 340 : 420), m = { l: 42, r: phone() ? 50 : 70, t: 12, b: 40 };
   const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
   const xt = niceTicks(Math.min(...xs, o.x0 ?? Infinity), Math.max(...xs));
   const yt = niceTicks(Math.min(...ys, o.y0 ?? Infinity), Math.max(...ys));
@@ -69,7 +74,7 @@ export function scatter(points, o = {}) {
 
 // series: [{name, values:[...], color?, dashed?}], x: labels
 export function line(series, x, o = {}) {
-  const W = 640, H = o.height ?? 260, m = { l: 40, r: 70, t: 12, b: 28 };
+  const W = fitW(o.width ?? 640), H = o.height ?? 260, m = { l: 36, r: phone() ? 76 : 70, t: 12, b: 28 };
   const all = series.flatMap((s) => s.values.filter((v) => v != null));
   let lo = Math.min(...all), hi = Math.max(...all);
   if (o.invert) [lo, hi] = [lo, hi];
@@ -81,15 +86,21 @@ export function line(series, x, o = {}) {
     : H - m.b - (v - y0) / (y1 - y0 || 1) * (H - m.t - m.b);
   const grid = yt.map((v) => `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/>`).join("");
   const ylab = yt.map((v) => `<text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`).join("");
-  const step = Math.ceil(x.length / 12);
+  const step = Math.ceil(x.length / (phone() ? 6 : 12));
   const xlab = x.map((v, i) => (i % step === 0 || i === x.length - 1) ? `<text x="${X(i)}" y="${H - 8}" text-anchor="middle">${esc(v)}</text>` : "").join("");
-  const paths = series.map((s, si) => {
+  // End labels, nudged apart vertically so close finishes stay readable.
+  const ends = series.map((s, si) => {
     const pts = s.values.map((v, i) => (v == null ? null : [X(i), Y(v)])).filter(Boolean);
+    return { si, pts, last: pts.at(-1), y: pts.at(-1)?.[1] ?? 0 };
+  });
+  const order = ends.filter((e) => e.last).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < order.length; i++) if (order[i].y - order[i - 1].y < 12) order[i].y = order[i - 1].y + 12;
+  const paths = ends.map(({ si, pts, last, y }) => {
+    const s = series[si];
     const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
-    const last = pts.at(-1);
     const c = s.color ?? seriesColor(si);
     return `<path d="${d}" fill="none" stroke="${c}" stroke-width="${s.bold ? 3 : 2}" ${s.dashed ? 'stroke-dasharray="5 4"' : ""} stroke-linejoin="round" stroke-linecap="round"/>`
-      + (last && s.label !== false ? `<text x="${last[0] + 6}" y="${last[1] + 4}" style="fill:var(--text);font-weight:${s.bold ? 700 : 500}">${esc(s.name).slice(0, 12)}</text>` : "");
+      + (last && s.label !== false ? `<text x="${last[0] + 6}" y="${y + 4}" style="fill:var(--text);font-weight:${s.bold ? 700 : 500}">${esc(s.name).slice(0, 12)}</text>` : "");
   }).join("");
   const svg = el(`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "line chart")}">
     <g class="grid">${grid}</g>${ylab}${xlab}${paths}

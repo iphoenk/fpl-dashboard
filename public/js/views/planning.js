@@ -184,9 +184,9 @@ export function fixtureOutlook() {
     });
     if (st.owned) rows = rows.filter((r) => ownedTeams.has(r.t.id));
     rows.sort((a, b) => b.avg - a.avg);
-    host.innerHTML = `<table class="fx-grid"><thead><tr><th>Club</th>${gws.map((g) => `<th>GW${g}</th>`).join("")}<th class="n">Avg</th><th class="n" title="${st.mode === "def" ? "expected goals against" : "expected goals for"} over the window">${st.mode === "def" ? "xGA" : "xG"}</th></tr></thead><tbody>${rows.map((r) => `<tr class="${ownedTeams.has(r.t.id) ? "owned" : ""}"><td class="club">${esc(r.t.short)}</td>${r.cells.map((cs) => `<td>${cs.length ? cs.map((f) => {
+    host.innerHTML = `<table class="fx-grid sticky"><thead><tr><th>Club</th>${gws.map((g) => `<th>GW${g}</th>`).join("")}<th class="n">Avg</th><th class="n" title="${st.mode === "def" ? "expected goals against" : "expected goals for"} over the window">${st.mode === "def" ? "xGA" : "xG"}</th></tr></thead><tbody>${rows.map((r) => `<tr class="${ownedTeams.has(r.t.id) ? "owned" : ""}"><td class="club">${esc(r.t.short)}</td>${r.cells.map((cs) => `<td>${cs.length ? cs.map((f) => {
       const v = val(f);
-      return `<span class="fx ${rClass(v)} ${st.target && v < 7.5 ? "dim" : ""}" title="${esc(`${S.teams.get(f.opp)?.name} (${f.home ? "H" : "A"}) · xG ${fmt(f.lamFor, 2)} · xGA ${fmt(f.lamAg, 2)} · CS ${pct(f.cs * 100)} · FDR ${f.fdr} · ${f.src}`)}">${f.home ? teamShort(f.opp).toUpperCase() : teamShort(f.opp).toLowerCase()} ${fmt(v, 0)}</span>`;
+      return `<span class="fx ${rClass(v)} ${st.target && v < 7.5 ? "dim" : ""}" data-tip="${esc(`${S.teams.get(f.opp)?.name} (${f.home ? "H" : "A"}) · xG ${fmt(f.lamFor, 2)} · xGA ${fmt(f.lamAg, 2)} · CS ${pct(f.cs * 100)} · FDR ${f.fdr} · ${f.src}`)}">${f.home ? teamShort(f.opp).toUpperCase() : teamShort(f.opp).toLowerCase()} ${fmt(v, 0)}</span>`;
     }).join(" ") : `<span class="fx blank">–</span>`}</td>`).join("")}<td class="n"><b>${fmt(r.avg, 1)}</b></td><td class="n">${fmt(r.xg, 1)}</td></tr>`).join("")}</tbody></table>`;
     const all = [...S.teams.values()].map((t) => {
       const fx = gws.flatMap((g) => S.fxByTeam.get(t.id)?.get(g) || []);
