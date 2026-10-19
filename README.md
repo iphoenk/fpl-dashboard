@@ -13,16 +13,34 @@ challenger model by reading its published snapshot.
 
 ## How it fits together
 
-```
-GitHub Actions (every 3h)                      Vercel
-  FPL API ─┐                                     public/  (static page + data/*.json)
-  Pinnacle ─┤                                    api/fpl.js (proxy for per-team data)
-  FFS ─────┤   pipeline/ ──► public/data/*.json ──►        │
-  Rotowire ┤   (model, xP over 8 GW)              commit    ▼
-  Opta ────┤                                           browser: team ID → proxy → FPL
-  V6 ──────┤  (Understat, Rotowire fallback, FPL fallback)
-  FPLens ──┤
-  Elite ───┘
+```mermaid
+flowchart TB
+  subgraph Sources["Data sources"]
+    FPL["Official FPL"]
+    External["Pinnacle · FFS · RotoWire · Opta"]
+    V6["V6 factual snapshot<br/>Understat + source fallbacks"]
+    Lens["FPLens challenger"]
+    Elite["Elite-manager ownership"]
+  end
+  subgraph Build["GitHub Actions · every 3 hours"]
+    Pipeline["Fetch and validate sources<br/>Build model + 8-GW projections"]
+    JSON["public/data/*.json"]
+    Commit["Commit updated data"]
+  end
+  subgraph Web["Vercel"]
+    Static["Static dashboard + JSON"]
+    Proxy["Read-only FPL proxy<br/>api/fpl.js"]
+  end
+  Browser["Browser · team ID"]
+  FPL --> Pipeline
+  External --> Pipeline
+  V6 --> Pipeline
+  Lens --> Pipeline
+  Elite --> Pipeline
+  Pipeline --> JSON --> Commit --> Static
+  Static --> Browser
+  Browser -->|"Team-specific request"| Proxy
+  Proxy -->|"Public team data"| FPL
 ```
 
 * Everything that is the same for every visitor (all players, fixtures,
