@@ -13,35 +13,23 @@ challenger model by reading its published snapshot.
 
 ## How it fits together
 
+**Shared data — refreshed in the background**
+
 ```mermaid
-flowchart TB
-  subgraph Sources["Data sources"]
-    FPL["Official FPL"]
-    External["Pinnacle · FFS · RotoWire · Opta"]
-    V6["V6 factual snapshot<br/>Understat + source fallbacks"]
-    Lens["FPLens challenger"]
-    Elite["Elite-manager ownership"]
-  end
-  subgraph Build["GitHub Actions · every 3 hours"]
-    Pipeline["Fetch and validate sources<br/>Build model + 8-GW projections"]
-    JSON["public/data/*.json"]
-    Commit["Commit updated data"]
-  end
-  subgraph Web["Vercel"]
-    Static["Static dashboard + JSON"]
-    Proxy["Read-only FPL proxy<br/>api/fpl.js"]
-  end
-  Browser["Browser · team ID"]
-  FPL --> Pipeline
-  External --> Pipeline
-  V6 --> Pipeline
-  Lens --> Pipeline
-  Elite --> Pipeline
-  Pipeline --> JSON --> Commit --> Static
-  Static --> Browser
-  Browser -->|"Team-specific request"| Proxy
-  Proxy -->|"Public team data"| FPL
+flowchart LR
+  S["Public data sources"] --> P["GitHub Actions · every 3h"]
+  P --> D["JSON snapshots on Vercel"]
 ```
+
+**Team data — fetched when requested**
+
+```mermaid
+flowchart LR
+  B["Browser · team ID"] --> A["Read-only API proxy"]
+  A --> F["Official FPL team data"]
+```
+
+The browser combines the shared JSON snapshots with the selected team’s public FPL data. Optional providers and their roles are listed in **Sources** below.
 
 * Everything that is the same for every visitor (all players, fixtures,
   projections) is built in Actions and committed as JSON. Opening the page is
