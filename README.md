@@ -1,4 +1,6 @@
-# fpl-dashboard
+# fpl-dashboard — legacy analytics pipeline
+
+> **Legacy analytics pipeline.** Dashboard utama: [FPL iphoenk](https://fpl-iphoenk.vercel.app/#dashboard). Kode aplikasi aktif: [iphoenk/fpl-iphoenk-dashboard](https://github.com/iphoenk/fpl-iphoenk-dashboard). Proyek Vercel repo ini bernama `fpl-dashboard-legacy`; arsitektur di bawah menjelaskan pipeline repo ini, bukan seluruh aplikasi utama.
 
 Personal FPL dashboard for any team ID: projections, transfer and chip planning,
 mini-league analysis and scouting. Hosted on Vercel, rebuilt every three hours
