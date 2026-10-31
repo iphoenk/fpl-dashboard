@@ -1,0 +1,54 @@
+name: Deadline watch
+
+# Cheap, frequent check that detects the moment FPL's "next gameweek" flips
+# (i.e. a deadline just passed) and immediately triggers a real data rebuild,
+# instead of waiting for the next scheduled 3-hour tick in build.yml.
+#
+# Why this exists: the consumer in iphoenk/fpl-iphoenk-dashboard
+# (multiuser-horizon.mjs) requires meta.next_gw to exactly match its own
+# live planning gameweek before it will use this repo's multi-GW
+# projections, and correctly refuses to use them otherwise (serving a
+# gameweek-shifted projection would be wrong, not just stale). Before this
+# workflow, that left a window of up to ~3h after every deadline (observed
+# ~1h17m on 2026-10-31, GW9->GW10) where the consumer's multi-GW horizon
+# silently fell back to the 1-GW Official advisory. This job shrinks that
+# window to at most ~15 minutes, without changing build.yml's own schedule
+# or touching the consumer's validation logic (which is correct as-is).
+#
+# This step makes two cheap read-only HTTP calls and nothing else, so it's
+# safe to run every 15 minutes all day under GitHub's free Actions minutes.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: deadline-watch
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Compare live next_gw against last published snapshot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          live_next=$(curl -fsS --max-time 15 https://fantasy.premierleague.com/api/bootstrap-static/ \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print(next(e['id'] for e in d['events'] if e['is_next']))")
+          published_next=$(curl -fsS --max-time 15 "https://raw.githubusercontent.com/${{ github.repository }}/main/public/data/meta.json" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin).get('next_gw',''))")
+          echo "live_next=$live_next published_next=$published_next"
+          if [ "$live_next" != "$published_next" ]; then
+            echo "Gameweek advanced ($published_next -> $live_next); triggering a rebuild."
+            gh workflow run build.yml --repo "${{ github.repository }}"
+          else
+            echo "No change; nothing to do."
+          fi
