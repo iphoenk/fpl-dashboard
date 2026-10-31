@@ -4,8 +4,9 @@
 
 Personal FPL dashboard for any team ID: projections, transfer and chip planning,
 mini-league analysis and scouting. Hosted on Vercel, rebuilt every three hours
-by GitHub Actions. Zero cost: public repo (free Actions minutes), Vercel Hobby,
-no paid APIs.
+by GitHub Actions, plus an extra rebuild within ~15 minutes of every deadline
+(see `deadline-watch.yml` below). Zero cost: public repo (free Actions
+minutes), Vercel Hobby, no paid APIs.
 
 Content follows the shape of [fpl-insights](https://github.com/JonnoMillar/fpl-insights)
 (Overview, Planning, Mini-league, Scout, plus a Market tab). That repo has no
@@ -22,6 +23,18 @@ flowchart LR
   S["Public data sources"] --> P["GitHub Actions · every 3h"]
   P --> D["JSON snapshots on Vercel"]
 ```
+
+A second, cheap workflow (`deadline-watch.yml`) polls every 15 minutes for
+whether FPL's own "next gameweek" flag has advanced since the last published
+snapshot, and if so triggers an immediate rebuild instead of waiting for the
+next 3-hour tick. This matters for consumers like
+[iphoenk/fpl-iphoenk-dashboard](https://github.com/iphoenk/fpl-iphoenk-dashboard),
+which treats this repo's multi-GW projections as valid only when its
+`next_gw` exactly matches the gameweek it's currently planning for (using a
+stale, pre-deadline `next_gw` would silently serve a gameweek-shifted
+projection, which is worse than serving none) — without this workflow, that
+consumer could see up to ~3 hours of unavailability right after every
+deadline before this repo's own data caught up.
 
 **Team data — fetched when requested**
 
